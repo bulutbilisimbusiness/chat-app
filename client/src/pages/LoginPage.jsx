@@ -11,7 +11,7 @@ const LoginPage = () => {
 	const [isDataSubmitted, setIsDataSubmitted] = useState(false);
 
 	const { login } = useContext(AuthContext);
-
+	// handler
 	const onSubmitHandler = (event) => {
 		event.preventDefault();
 		if (currState === "Sign up" && !isDataSubmitted) {
