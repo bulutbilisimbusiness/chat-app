@@ -2,7 +2,9 @@ import cors from "cors";
 import "dotenv/config.js";
 import express from "express";
 import http from "http";
+import path from "path";
 import { Server } from "socket.io";
+import { fileURLToPath } from "url";
 import { connectDB } from "./lib/db.js";
 import messageRouter from "./routes/messageRoutes.js";
 import userRouter from "./routes/userRoutes.js";
@@ -35,6 +37,17 @@ app.use(cors());
 app.use("/api/status", (req, res) => res.send("Server is live"));
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
+
+// __dirname çözümü
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// React frontend'i serve et
+app.use(express.static(path.join(__dirname, "../client/dist")));
+
+app.get("*", (req, res) => {
+	res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+});
 
 await connectDB();
 if (process.env.NODE_ENV !== "production") {
