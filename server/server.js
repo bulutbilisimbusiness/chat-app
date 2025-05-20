@@ -2,10 +2,10 @@ import cors from "cors";
 import "dotenv/config.js";
 import express from "express";
 import http from "http";
-import { connectDB } from "./lib/db.js";
-import userRouter from "./routes/userRoutes.js";
-import messageRouter from "./routes/messageRoutes.js";
 import { Server } from "socket.io";
+import { connectDB } from "./lib/db.js";
+import messageRouter from "./routes/messageRoutes.js";
+import userRouter from "./routes/userRoutes.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -37,6 +37,9 @@ app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
 
 await connectDB();
+if (process.env.NODE_ENV !== "production") {
+	const PORT = process.env.PORT || 5000;
+	server.listen(PORT, () => console.log("Server is running on PORT: " + PORT));
+}
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log("Server is running on PORT: " + PORT));
+export default server;
