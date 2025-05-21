@@ -54,6 +54,8 @@ io.on("connection", (socket) => {
 	if (userId) {
 		console.log(`User connected: ${userId}`);
 		userSocketMap[userId] = socket.id;
+
+		// Tüm kullanıcılara güncel online listesini gönder
 		io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
 		socket.on("sendMessage", ({ message, receiverId }) => {
@@ -66,6 +68,7 @@ io.on("connection", (socket) => {
 		socket.on("disconnect", () => {
 			console.log(`User disconnected: ${userId}`);
 			delete userSocketMap[userId];
+			// Tüm kullanıcılara güncel online listesini gönder
 			io.emit("getOnlineUsers", Object.keys(userSocketMap));
 		});
 	}

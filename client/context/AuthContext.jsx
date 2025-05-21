@@ -101,6 +101,7 @@ export const AuthProvider = ({ children }) => {
 
 			newSocket.on("connect", () => {
 				console.log("Socket connected successfully");
+				setOnlineUsers((prev) => [...new Set([...prev, userData._id])]);
 			});
 
 			newSocket.on("connect_error", (error) => {
@@ -116,7 +117,7 @@ export const AuthProvider = ({ children }) => {
 			newSocket.on("getOnlineUsers", (users) => {
 				if (Array.isArray(users)) {
 					console.log("Online users updated:", users);
-					setOnlineUsers(users);
+					setOnlineUsers([...new Set([...users, userData._id])]);
 				}
 			});
 

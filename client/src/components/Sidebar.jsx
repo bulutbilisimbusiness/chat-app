@@ -12,8 +12,8 @@ const Sidebar = () => {
 		unseenMessages,
 		setUnseenMessages,
 	} = useContext(ChatContext);
-	const { logout, onlineUsers, authUser } = useContext(AuthContext);
-	const [input, setInput] = useState(false);
+	const { logout, onlineUsers } = useContext(AuthContext);
+	const [input, setInput] = useState("");
 	const navigate = useNavigate();
 	const filteredUsers = input
 		? users.filter((user) =>
@@ -25,10 +25,9 @@ const Sidebar = () => {
 		getUsers();
 	}, [onlineUsers]);
 
-	// Basit online kullanıcı kontrolü - kendi ID'miz de online olarak işaretlenir
+	// Basit online kullanıcı kontrolü
 	const isUserOnline = (userId) => {
 		if (!userId) return false;
-		if (authUser && authUser._id === userId) return true; // Kendimiz her zaman online
 		return Array.isArray(onlineUsers) && onlineUsers.includes(userId);
 	};
 
