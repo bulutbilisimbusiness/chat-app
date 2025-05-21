@@ -106,15 +106,17 @@ export const AuthProvider = ({ children }) => {
 			newSocket.on("connect", () => {
 				console.log("Socket connected successfully");
 				newSocket.emit("userConnected", userData._id);
+				newSocket.emit("getOnlineUsers");
 			});
 
 			newSocket.on("connect_error", (error) => {
 				console.error("Socket.IO Connection Error:", error.message);
+				setOnlineUsers([]);
 			});
 
 			newSocket.on("disconnect", () => {
 				console.log("Socket disconnected");
-				setOnlineUsers((prev) => prev.filter((id) => id !== userData._id));
+				setOnlineUsers([]);
 			});
 
 			newSocket.on("getOnlineUsers", (users) => {
@@ -124,9 +126,19 @@ export const AuthProvider = ({ children }) => {
 				}
 			});
 
+			newSocket.on("userStatusChanged", ({ userId, status }) => {
+				console.log(`User ${userId} status changed to ${status}`);
+				setOnlineUsers((prev) =>
+					status === "online"
+						? [...new Set([...prev, userId])]
+						: prev.filter((id) => id !== userId)
+				);
+			});
+
 			setSocket(newSocket);
 		} catch (error) {
 			console.error("Socket initialization error:", error);
+			setOnlineUsers([]);
 		}
 	};
 

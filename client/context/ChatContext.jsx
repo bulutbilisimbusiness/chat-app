@@ -43,11 +43,14 @@ export const ChatProvider = ({ children }) => {
 				messageData
 			);
 			if (data.success) {
-				setMessages((prevMessages) => [...prevMessages, data.newMessage]);
+				const newMessage = data.newMessage;
+				setMessages((prevMessages) => [...prevMessages, newMessage]);
+
 				// Yeni mesajı socket üzerinden gönder
 				if (socket) {
+					console.log("Sending message via socket:", newMessage);
 					socket.emit("sendMessage", {
-						message: data.newMessage,
+						message: newMessage,
 						receiverId: selectedUser._id,
 					});
 				}
@@ -55,23 +58,30 @@ export const ChatProvider = ({ children }) => {
 				toast.error(data.message);
 			}
 		} catch (error) {
-			toast.error(error.message);
+			console.error("Send message error:", error);
+			toast.error(error.message || "Failed to send message");
 		}
 	};
 
 	// Yeni mesaj alındığında
 	const handleNewMessage = (newMessage) => {
+		console.log("New message received:", newMessage);
+
 		// Seçili kullanıcı ile mesajlaşıyorsak
 		if (selectedUser && newMessage.senderId === selectedUser._id) {
+			console.log("Message is from selected user, marking as seen");
 			// Mesajı görüldü olarak işaretle
 			newMessage.seen = true;
 			// Mesajlar listesine ekle
 			setMessages((prevMessages) => [...prevMessages, newMessage]);
 			// Sunucuda mesajı görüldü olarak işaretle
-			axios.put(`/api/messages/mark/${newMessage._id}`);
+			axios.put(`/api/messages/mark/${newMessage._id}`).catch((error) => {
+				console.error("Error marking message as seen:", error);
+			});
 		}
 		// Başka biriyle mesajlaşıyorsak veya hiç mesajlaşmıyorsak
 		else {
+			console.log("Message is from another user, updating unseen count");
 			// Görülmemiş mesajların sayısını güncelle
 			setUnseenMessages((prev) => ({
 				...prev,
@@ -85,12 +95,19 @@ export const ChatProvider = ({ children }) => {
 
 	// Socket mesaj dinleme ayarları
 	const setupMessageListener = () => {
-		if (!socket) return;
+		if (!socket) {
+			console.log("No socket connection available");
+			return;
+		}
 
-		socket.off("newMessage");
+		console.log("Setting up message listeners");
+
+		// Önceki dinleyicileri temizle
 		socket.off("messageReceived");
 
+		// Yeni mesaj dinleyicisini ekle
 		socket.on("messageReceived", (newMessage) => {
+			console.log("Message received via socket:", newMessage);
 			handleNewMessage(newMessage);
 		});
 
@@ -128,8 +145,7 @@ export const ChatProvider = ({ children }) => {
 		// Component unmount olduğunda cleanup
 		return () => {
 			if (socket) {
-				console.log("Removing message listener");
-				socket.off("newMessage");
+				console.log("Cleaning up message listeners");
 				socket.off("messageReceived");
 				messageListenerActive.current = false;
 			}
