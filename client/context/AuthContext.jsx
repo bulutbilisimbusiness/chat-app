@@ -96,7 +96,11 @@ export const AuthProvider = ({ children }) => {
 			console.log("Connecting to socket.io server...");
 			const newSocket = io(backendUrl, {
 				query: { userId: userData._id },
-				transports: ["websocket", "polling"],
+				transports: ["websocket"],
+				path: "/socket.io/",
+				reconnection: true,
+				reconnectionAttempts: 5,
+				reconnectionDelay: 1000,
 			});
 
 			newSocket.on("connect", () => {
@@ -113,7 +117,6 @@ export const AuthProvider = ({ children }) => {
 				setOnlineUsers([]);
 			});
 
-			// Online kullanıcıları dinle
 			newSocket.on("onlineUsers", (users) => {
 				console.log("Online users:", users);
 				setOnlineUsers(users);
