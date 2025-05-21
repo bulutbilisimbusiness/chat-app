@@ -96,20 +96,30 @@ export const AuthProvider = ({ children }) => {
 			console.log("Connecting to socket.io server...");
 			const newSocket = io(backendUrl, {
 				query: { userId: userData._id },
+				transports: ["websocket", "polling"],
+				reconnection: true,
+				reconnectionAttempts: 5,
+				reconnectionDelay: 1000,
+				timeout: 20000,
 			});
 
-			newSocket.on("connect", () => {});
+			newSocket.on("connect", () => {
+				console.log("Socket connected successfully");
+				newSocket.emit("userConnected", userData._id);
+			});
 
 			newSocket.on("connect_error", (error) => {
 				console.error("Socket.IO Connection Error:", error.message);
 			});
 
 			newSocket.on("disconnect", () => {
+				console.log("Socket disconnected");
 				setOnlineUsers((prev) => prev.filter((id) => id !== userData._id));
 			});
 
 			newSocket.on("getOnlineUsers", (users) => {
 				if (Array.isArray(users)) {
+					console.log("Online users updated:", users);
 					setOnlineUsers(users);
 				}
 			});

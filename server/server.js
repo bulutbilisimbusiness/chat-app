@@ -16,7 +16,10 @@ app.use(
 	cors({
 		origin:
 			process.env.NODE_ENV === "production"
-				? ["https://chat-app-frontend-five-olive.vercel.app"]
+				? [
+						"https://chat-app-frontend-five-olive.vercel.app",
+						"https://chat-app-backend-two-tau.vercel.app",
+				  ]
 				: "http://localhost:5173",
 		credentials: true,
 	})
@@ -30,11 +33,17 @@ const io = new Server(server, {
 	cors: {
 		origin:
 			process.env.NODE_ENV === "production"
-				? ["https://chat-app-frontend-five-olive.vercel.app"]
+				? [
+						"https://chat-app-frontend-five-olive.vercel.app",
+						"https://chat-app-backend-two-tau.vercel.app",
+				  ]
 				: "http://localhost:5173",
 		methods: ["GET", "POST"],
 		credentials: true,
 	},
+	transports: ["websocket", "polling"],
+	pingTimeout: 60000,
+	pingInterval: 25000,
 });
 
 // Online users tracking
@@ -43,10 +52,16 @@ const userSocketMap = {};
 io.on("connection", (socket) => {
 	const userId = socket.handshake.query.userId;
 	if (userId) {
+		console.log(`User connected: ${userId}`);
 		userSocketMap[userId] = socket.id;
 		io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
-		// Mesaj gönderme olayını dinle
+		socket.on("userConnected", (userId) => {
+			console.log(`User explicitly connected: ${userId}`);
+			userSocketMap[userId] = socket.id;
+			io.emit("getOnlineUsers", Object.keys(userSocketMap));
+		});
+
 		socket.on("sendMessage", ({ message, receiverId }) => {
 			const receiverSocketId = userSocketMap[receiverId];
 			if (receiverSocketId) {
@@ -55,6 +70,7 @@ io.on("connection", (socket) => {
 		});
 
 		socket.on("disconnect", () => {
+			console.log(`User disconnected: ${userId}`);
 			delete userSocketMap[userId];
 			io.emit("getOnlineUsers", Object.keys(userSocketMap));
 		});
