@@ -96,24 +96,37 @@ export const AuthProvider = ({ children }) => {
 			console.log("Connecting to socket.io server...");
 			const newSocket = io(backendUrl, {
 				query: { userId: userData._id },
-				transports: ["websocket"],
+				transports: ["websocket", "polling"],
 				path: "/socket.io/",
 				reconnection: true,
 				reconnectionAttempts: 5,
 				reconnectionDelay: 1000,
+				timeout: 20000,
+				forceNew: true,
 			});
 
 			newSocket.on("connect", () => {
 				console.log("Socket connected successfully");
+				// Immediately request online users list
+				newSocket.emit("getOnlineUsers");
 			});
 
 			newSocket.on("connect_error", (error) => {
 				console.error("Socket.IO Connection Error:", error.message);
+				// Try to reconnect with polling if websocket fails
+				if (error.message.includes("websocket")) {
+					console.log("Retrying with polling transport...");
+					newSocket.io.opts.transports = ["polling", "websocket"];
+				}
 				setOnlineUsers([]);
 			});
 
-			newSocket.on("disconnect", () => {
-				console.log("Socket disconnected");
+			newSocket.on("disconnect", (reason) => {
+				console.log("Socket disconnected:", reason);
+				if (reason === "io server disconnect") {
+					// Reconnect if server initiated disconnect
+					newSocket.connect();
+				}
 				setOnlineUsers([]);
 			});
 

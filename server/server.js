@@ -33,19 +33,24 @@ const io = new Server(server, {
 	cors: {
 		origin:
 			process.env.NODE_ENV === "production"
-				? [
-						"https://chat-app-frontend-five-olive.vercel.app",
-						"https://chat-app-backend-two-tau.vercel.app",
-				  ]
+				? ["https://chat-app-frontend-five-olive.vercel.app"]
 				: "http://localhost:5173",
 		methods: ["GET", "POST"],
 		credentials: true,
 	},
 	path: "/socket.io/",
-	transports: ["websocket"],
+	transports: ["websocket", "polling"],
 	allowEIO3: true,
 	pingTimeout: 60000,
 	pingInterval: 25000,
+	cors: {
+		origin:
+			process.env.NODE_ENV === "production"
+				? ["https://chat-app-frontend-five-olive.vercel.app"]
+				: "http://localhost:5173",
+		methods: ["GET", "POST"],
+		credentials: true,
+	},
 });
 
 // Online users tracking
@@ -57,8 +62,13 @@ io.on("connection", (socket) => {
 		console.log(`User connected: ${userId}`);
 		userSocketMap[userId] = socket.id;
 
-		// Yeni kullanıcı bağlandığında tüm kullanıcılara bildir
+		// Send initial online users list
 		io.emit("onlineUsers", Object.keys(userSocketMap));
+
+		// Handle getOnlineUsers request
+		socket.on("getOnlineUsers", () => {
+			socket.emit("onlineUsers", Object.keys(userSocketMap));
+		});
 
 		socket.on("sendMessage", ({ message, receiverId }) => {
 			const receiverSocketId = userSocketMap[receiverId];
@@ -67,10 +77,18 @@ io.on("connection", (socket) => {
 			}
 		});
 
-		socket.on("disconnect", () => {
-			console.log(`User disconnected: ${userId}`);
+		// Handle disconnection
+		socket.on("disconnect", (reason) => {
+			console.log(`User disconnected: ${userId}, reason: ${reason}`);
 			delete userSocketMap[userId];
-			// Kullanıcı ayrıldığında tüm kullanıcılara bildir
+			// Notify all clients about updated online users
+			io.emit("onlineUsers", Object.keys(userSocketMap));
+		});
+
+		// Handle errors
+		socket.on("error", (error) => {
+			console.error(`Socket error for user ${userId}:`, error);
+			delete userSocketMap[userId];
 			io.emit("onlineUsers", Object.keys(userSocketMap));
 		});
 	}
