@@ -16,29 +16,21 @@ const app = express();
 app.use(express.json({ limit: "4mb" }));
 app.use(
 	cors({
-		origin:
-			process.env.NODE_ENV === "production"
-				? [
-						"https://chat-app-client-five.vercel.app",
-						"https://chat-app-client-erhan.vercel.app",
-				  ]
-				: "*",
+		origin: "*",
 	})
 );
 
 // Create HTTP server
 const server = http.createServer(app);
 
-// Initialize Socket.io (only in development)
-export const io =
-	process.env.NODE_ENV !== "production"
-		? new Server(server, { cors: { origin: "*" } })
-		: null;
+// Socket.io setup
+let io;
+try {
+	io = new Server(server, { cors: { origin: "*" } });
 
-export const userSocketMap = {};
+	// User socket mapping for online status
+	const userSocketMap = {};
 
-// Socket.io setup (only in development)
-if (io) {
 	io.on("connection", (socket) => {
 		const userId = socket.handshake.query.userId;
 		console.log("User Connected", userId);
@@ -52,10 +44,21 @@ if (io) {
 			io.emit("getOnlineUsers", Object.keys(userSocketMap));
 		});
 	});
+
+	// Export for controllers
+	app.set("io", io);
+	app.set("userSocketMap", userSocketMap);
+} catch (error) {
+	console.error("Socket.io initialization error:", error);
 }
 
 // Connect to MongoDB
 connectDB().catch((err) => console.error("Database connection error:", err));
+
+// Root route handler
+app.get("/", (req, res) => {
+	res.status(200).json({ message: "Server is running" });
+});
 
 // API routes
 app.get("/api/status", (req, res) => res.send("Server is live"));
@@ -80,4 +83,10 @@ if (process.env.NODE_ENV !== "production") {
 	server.listen(PORT, () => console.log("Server is running on PORT: " + PORT));
 }
 
+// Handle 404s
+app.use((req, res) => {
+	res.status(404).json({ message: "Route not found" });
+});
+
+// Export for serverless (using ES modules syntax)
 export default app;
