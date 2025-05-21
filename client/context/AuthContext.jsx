@@ -96,7 +96,7 @@ export const AuthProvider = ({ children }) => {
 			console.log("Connecting to socket.io server...");
 			const newSocket = io(backendUrl, {
 				query: { userId: userData._id },
-				transports: ["polling", "websocket"],
+				transports: ["polling"],
 				path: "/socket.io/",
 				reconnection: true,
 				reconnectionAttempts: 5,
@@ -115,32 +115,54 @@ export const AuthProvider = ({ children }) => {
 
 			newSocket.on("connect_error", (error) => {
 				console.error("Socket.IO Connection Error:", error.message);
-				if (error.message.includes("websocket")) {
-					console.log("Retrying with polling transport...");
-					newSocket.io.opts.transports = ["polling"];
-				}
 				setOnlineUsers([]);
+
+				// Try to reconnect after a delay
+				setTimeout(() => {
+					console.log("Attempting to reconnect...");
+					newSocket.connect();
+				}, 2000);
 			});
 
 			newSocket.on("disconnect", (reason) => {
 				console.log("Socket disconnected:", reason);
 				setOnlineUsers([]);
+
 				if (reason === "io server disconnect" || reason === "transport close") {
-					console.log("Attempting to reconnect...");
 					setTimeout(() => {
+						console.log("Attempting to reconnect after disconnect...");
 						newSocket.connect();
-					}, 1000);
+					}, 2000);
 				}
 			});
 
 			newSocket.on("onlineUsers", (users) => {
 				console.log("Online users:", users);
-				setOnlineUsers(users || []);
+				if (Array.isArray(users)) {
+					setOnlineUsers(users);
+				} else {
+					setOnlineUsers([]);
+				}
 			});
 
 			// Connect after setting up handlers
 			newSocket.connect();
 			setSocket(newSocket);
+
+			// Health check interval
+			const healthCheck = setInterval(() => {
+				if (newSocket.connected) {
+					newSocket.emit("getOnlineUsers");
+				}
+			}, 30000);
+
+			// Cleanup on unmount
+			return () => {
+				clearInterval(healthCheck);
+				if (newSocket) {
+					newSocket.disconnect();
+				}
+			};
 		} catch (error) {
 			console.error("Socket initialization error:", error);
 			setOnlineUsers([]);

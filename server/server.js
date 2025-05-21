@@ -7,42 +7,33 @@ import { connectDB } from "./lib/db.js";
 import messageRouter from "./routes/messageRoutes.js";
 import userRouter from "./routes/userRoutes.js";
 
-// Initialize Express
 const app = express();
-
-// Configure middleware
-app.use(express.json({ limit: "4mb" }));
-app.use(
-	cors({
-		origin:
-			process.env.NODE_ENV === "production"
-				? "https://chat-app-frontend-five-olive.vercel.app"
-				: "http://localhost:5173",
-		methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-		credentials: true,
-		allowedHeaders: ["Content-Type", "Authorization", "token"],
-	})
-);
-
-// Create HTTP server
 const server = http.createServer(app);
 
-// Socket.io setup
+// CORS configuration
+const corsOptions = {
+	origin:
+		process.env.NODE_ENV === "production"
+			? "https://chat-app-frontend-five-olive.vercel.app"
+			: "http://localhost:5173",
+	methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+	allowedHeaders: ["Content-Type", "Authorization", "token"],
+	credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.use(express.json({ limit: "4mb" }));
+
+// Socket.IO setup
 const io = new Server(server, {
-	cors: {
-		origin:
-			process.env.NODE_ENV === "production"
-				? "https://chat-app-frontend-five-olive.vercel.app"
-				: "http://localhost:5173",
-		methods: ["GET", "POST"],
-		credentials: true,
-		allowedHeaders: ["Content-Type", "Authorization", "token"],
-	},
+	cors: corsOptions,
 	path: "/socket.io/",
 	transports: ["polling", "websocket"],
 	allowEIO3: true,
 	pingTimeout: 60000,
 	pingInterval: 25000,
+	maxHttpBufferSize: 1e8,
+	allowUpgrades: true,
 });
 
 // Online users tracking
@@ -73,7 +64,6 @@ io.on("connection", (socket) => {
 		socket.on("disconnect", (reason) => {
 			console.log(`User disconnected: ${userId}, reason: ${reason}`);
 			delete userSocketMap[userId];
-			// Notify all clients about updated online users
 			io.emit("onlineUsers", Object.keys(userSocketMap));
 		});
 
@@ -93,15 +83,19 @@ app.set("userSocketMap", userSocketMap);
 // Connect to MongoDB
 connectDB().catch((err) => console.error("Database connection error:", err));
 
-// API routes
+// Health check endpoint
 app.get("/", (req, res) => {
 	res.json({ message: "Chat App API is running" });
+});
+
+// Socket.IO health check endpoint
+app.get("/socket.io-health", (req, res) => {
+	res.json({ status: "ok", connections: Object.keys(userSocketMap).length });
 });
 
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
 
-// Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log("Server running on port", PORT));
 
