@@ -75,6 +75,10 @@ app.set("userSocketMap", userSocketMap);
 connectDB().catch((err) => console.error("Database connection error:", err));
 
 // API routes
+app.get("/", (req, res) => {
+	res.json({ message: "Chat App API is running" });
+});
+
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
 
