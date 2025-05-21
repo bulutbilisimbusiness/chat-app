@@ -2,7 +2,12 @@ import axios from "axios";
 import { createContext, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+// Default to the deployed URL if environment variable is not available
+const backendUrl =
+	import.meta.env.VITE_BACKEND_URL ||
+	"https://chat-app-backend-two-tau.vercel.app";
+console.log("Using backend URL:", backendUrl);
 axios.defaults.baseURL = backendUrl;
 
 export const AuthContext = createContext();
@@ -25,7 +30,8 @@ export const AuthProvider = ({ children }) => {
 				connectSocket(data.user);
 			}
 		} catch (error) {
-			toast.error(error.message);
+			console.error("Auth check error:", error);
+			toast.error(error.message || "Authentication failed");
 		}
 	};
 	const login = async (state, credentials) => {
@@ -42,7 +48,8 @@ export const AuthProvider = ({ children }) => {
 				toast.error(data.message);
 			}
 		} catch (error) {
-			toast.error(error.message);
+			console.error("Login error:", error);
+			toast.error(error.message || "Login failed");
 		}
 	};
 
@@ -53,7 +60,7 @@ export const AuthProvider = ({ children }) => {
 		setOnlineUsers([]);
 		axios.defaults.headers.common["token"] = null;
 		toast.success("Logged out successfully");
-		socket.disconnect();
+		if (socket) socket.disconnect();
 	};
 	const updateProfile = async (body) => {
 		try {
@@ -63,28 +70,33 @@ export const AuthProvider = ({ children }) => {
 				toast.success("Profile updated successfully");
 			}
 		} catch (error) {
-			toast.error(error.message);
+			console.error("Update profile error:", error);
+			toast.error(error.message || "Profile update failed");
 		}
 	};
 	const connectSocket = (userData) => {
 		if (!userData || socket?.connected) return;
-		const newSocket = io(backendUrl, {
-			query: {
-				userId: userData._id,
-			},
-		});
-		newSocket.connect();
-		setSocket(newSocket);
+		try {
+			const newSocket = io(backendUrl, {
+				query: {
+					userId: userData._id,
+				},
+			});
+			newSocket.connect();
+			setSocket(newSocket);
 
-		newSocket.on("getOnlineUsers", (userIds) => {
-			setOnlineUsers(userIds);
-		});
+			newSocket.on("getOnlineUsers", (userIds) => {
+				setOnlineUsers(userIds);
+			});
+		} catch (error) {
+			console.error("Socket connection error:", error);
+		}
 	};
 	useEffect(() => {
 		if (token) {
 			axios.defaults.headers.common["token"] = token;
+			checkAuth();
 		}
-		checkAuth();
 	}, []);
 	const value = {
 		axios,
