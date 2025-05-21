@@ -12,6 +12,11 @@ import userRouter from "./routes/userRoutes.js";
 const app = express();
 const server = http.createServer(app);
 
+// Configure middleware first
+app.use(express.json({ limit: "4mb" }));
+app.use(cors());
+
+// Set up socket.io
 export const io = new Server(server, {
 	cors: {
 		origin: "*",
@@ -31,28 +36,33 @@ io.on("connection", (socket) => {
 		io.emit("getOnlineUsers", Object.keys(userSocketMap));
 	});
 });
-app.use(express.json({ limit: "4mb" }));
-app.use(cors());
 
-app.use("/api/status", (req, res) => res.send("Server is live"));
+// API routes
+app.get("/api/status", (req, res) => res.send("Server is live"));
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
 
-// __dirname çözümü
+// Static file serving
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// React frontend'i serve et
 app.use(express.static(path.join(__dirname, "../client/dist")));
 
+// Catch-all route for SPA
 app.get("*", (req, res) => {
 	res.sendFile(path.join(__dirname, "../client/dist/index.html"));
 });
 
-await connectDB();
-if (process.env.NODE_ENV !== "production") {
-	const PORT = process.env.PORT || 5000;
-	server.listen(PORT, () => console.log("Server is running on PORT: " + PORT));
+// Connect to database and start server
+try {
+	await connectDB();
+	if (process.env.NODE_ENV !== "production") {
+		const PORT = process.env.PORT || 5000;
+		server.listen(PORT, () =>
+			console.log("Server is running on PORT: " + PORT)
+		);
+	}
+} catch (error) {
+	console.error("Failed to start server:", error);
 }
 
 export default server;
