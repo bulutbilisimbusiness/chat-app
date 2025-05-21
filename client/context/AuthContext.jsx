@@ -94,7 +94,7 @@ export const AuthProvider = ({ children }) => {
 
 		try {
 			console.log("Connecting to socket.io server...");
-			const newSocket = io("http://localhost:5000", {
+			const newSocket = io(backendUrl, {
 				query: { userId: userData._id },
 			});
 
