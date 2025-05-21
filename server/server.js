@@ -55,8 +55,8 @@ io.on("connection", (socket) => {
 		console.log(`User connected: ${userId}`);
 		userSocketMap[userId] = socket.id;
 
-		// Tüm kullanıcılara güncel online listesini gönder
-		io.emit("getOnlineUsers", Object.keys(userSocketMap));
+		// Yeni kullanıcı bağlandığında tüm kullanıcılara bildir
+		io.emit("onlineUsers", Object.keys(userSocketMap));
 
 		socket.on("sendMessage", ({ message, receiverId }) => {
 			const receiverSocketId = userSocketMap[receiverId];
@@ -68,8 +68,8 @@ io.on("connection", (socket) => {
 		socket.on("disconnect", () => {
 			console.log(`User disconnected: ${userId}`);
 			delete userSocketMap[userId];
-			// Tüm kullanıcılara güncel online listesini gönder
-			io.emit("getOnlineUsers", Object.keys(userSocketMap));
+			// Kullanıcı ayrıldığında tüm kullanıcılara bildir
+			io.emit("onlineUsers", Object.keys(userSocketMap));
 		});
 	}
 });
