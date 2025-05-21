@@ -97,16 +97,10 @@ export const AuthProvider = ({ children }) => {
 			const newSocket = io(backendUrl, {
 				query: { userId: userData._id },
 				transports: ["websocket", "polling"],
-				reconnection: true,
-				reconnectionAttempts: 5,
-				reconnectionDelay: 1000,
-				timeout: 20000,
 			});
 
 			newSocket.on("connect", () => {
 				console.log("Socket connected successfully");
-				newSocket.emit("userConnected", userData._id);
-				newSocket.emit("getOnlineUsers");
 			});
 
 			newSocket.on("connect_error", (error) => {
@@ -126,32 +120,6 @@ export const AuthProvider = ({ children }) => {
 				}
 			});
 
-			newSocket.on("userStatusChanged", ({ userId, status }) => {
-				console.log(`User ${userId} status changed to ${status}`);
-				setOnlineUsers((prev) =>
-					status === "online"
-						? [...new Set([...prev, userId])]
-						: prev.filter((id) => id !== userId)
-				);
-			});
-
-			// Ping-pong mekanizması
-			newSocket.on("ping", () => {
-				console.log("Received ping from server");
-				newSocket.emit("pong");
-			});
-
-			// Periyodik olarak online durumu kontrolü
-			const statusCheckInterval = setInterval(() => {
-				if (newSocket.connected) {
-					console.log("Requesting online users update");
-					newSocket.emit("getOnlineUsers");
-				}
-			}, 30000);
-
-			// Socket nesnesine interval'i ekle (cleanup için)
-			newSocket.statusCheckInterval = statusCheckInterval;
-
 			setSocket(newSocket);
 		} catch (error) {
 			console.error("Socket initialization error:", error);
@@ -167,8 +135,6 @@ export const AuthProvider = ({ children }) => {
 
 		return () => {
 			if (socket) {
-				console.log("Cleaning up socket connection");
-				clearInterval(socket.statusCheckInterval);
 				socket.disconnect();
 			}
 		};
