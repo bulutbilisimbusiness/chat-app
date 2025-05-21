@@ -96,45 +96,50 @@ export const AuthProvider = ({ children }) => {
 			console.log("Connecting to socket.io server...");
 			const newSocket = io(backendUrl, {
 				query: { userId: userData._id },
-				transports: ["websocket", "polling"],
+				transports: ["polling", "websocket"],
 				path: "/socket.io/",
 				reconnection: true,
 				reconnectionAttempts: 5,
 				reconnectionDelay: 1000,
 				timeout: 20000,
 				forceNew: true,
+				withCredentials: true,
+				autoConnect: false,
 			});
 
+			// Setup event handlers before connecting
 			newSocket.on("connect", () => {
 				console.log("Socket connected successfully");
-				// Immediately request online users list
 				newSocket.emit("getOnlineUsers");
 			});
 
 			newSocket.on("connect_error", (error) => {
 				console.error("Socket.IO Connection Error:", error.message);
-				// Try to reconnect with polling if websocket fails
 				if (error.message.includes("websocket")) {
 					console.log("Retrying with polling transport...");
-					newSocket.io.opts.transports = ["polling", "websocket"];
+					newSocket.io.opts.transports = ["polling"];
 				}
 				setOnlineUsers([]);
 			});
 
 			newSocket.on("disconnect", (reason) => {
 				console.log("Socket disconnected:", reason);
-				if (reason === "io server disconnect") {
-					// Reconnect if server initiated disconnect
-					newSocket.connect();
-				}
 				setOnlineUsers([]);
+				if (reason === "io server disconnect" || reason === "transport close") {
+					console.log("Attempting to reconnect...");
+					setTimeout(() => {
+						newSocket.connect();
+					}, 1000);
+				}
 			});
 
 			newSocket.on("onlineUsers", (users) => {
 				console.log("Online users:", users);
-				setOnlineUsers(users);
+				setOnlineUsers(users || []);
 			});
 
+			// Connect after setting up handlers
+			newSocket.connect();
 			setSocket(newSocket);
 		} catch (error) {
 			console.error("Socket initialization error:", error);

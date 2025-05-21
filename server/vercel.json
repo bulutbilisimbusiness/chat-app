@@ -11,26 +11,29 @@
 			"src": "/socket.io/(.*)",
 			"headers": {
 				"Access-Control-Allow-Origin": "https://chat-app-frontend-five-olive.vercel.app",
-				"Access-Control-Allow-Methods": "GET,HEAD,PUT,PATCH,POST,DELETE",
-				"Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+				"Access-Control-Allow-Methods": "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+				"Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization, token",
 				"Access-Control-Allow-Credentials": "true"
 			},
 			"continue": true
 		},
 		{
 			"src": "/socket.io/(.*)",
-			"dest": "server.js"
-		},
-		{
-			"handle": "filesystem"
+			"dest": "/server.js"
 		},
 		{
 			"src": "/api/(.*)",
-			"dest": "server.js"
+			"headers": {
+				"Access-Control-Allow-Origin": "https://chat-app-frontend-five-olive.vercel.app",
+				"Access-Control-Allow-Methods": "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+				"Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization, token",
+				"Access-Control-Allow-Credentials": "true"
+			},
+			"dest": "/server.js"
 		},
 		{
 			"src": "/(.*)",
-			"dest": "server.js"
+			"dest": "/server.js"
 		}
 	],
 	"env": {

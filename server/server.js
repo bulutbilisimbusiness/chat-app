@@ -16,12 +16,11 @@ app.use(
 	cors({
 		origin:
 			process.env.NODE_ENV === "production"
-				? [
-						"https://chat-app-frontend-five-olive.vercel.app",
-						"https://chat-app-backend-two-tau.vercel.app",
-				  ]
+				? "https://chat-app-frontend-five-olive.vercel.app"
 				: "http://localhost:5173",
+		methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 		credentials: true,
+		allowedHeaders: ["Content-Type", "Authorization", "token"],
 	})
 );
 
@@ -33,24 +32,17 @@ const io = new Server(server, {
 	cors: {
 		origin:
 			process.env.NODE_ENV === "production"
-				? ["https://chat-app-frontend-five-olive.vercel.app"]
+				? "https://chat-app-frontend-five-olive.vercel.app"
 				: "http://localhost:5173",
 		methods: ["GET", "POST"],
 		credentials: true,
+		allowedHeaders: ["Content-Type", "Authorization", "token"],
 	},
 	path: "/socket.io/",
-	transports: ["websocket", "polling"],
+	transports: ["polling", "websocket"],
 	allowEIO3: true,
 	pingTimeout: 60000,
 	pingInterval: 25000,
-	cors: {
-		origin:
-			process.env.NODE_ENV === "production"
-				? ["https://chat-app-frontend-five-olive.vercel.app"]
-				: "http://localhost:5173",
-		methods: ["GET", "POST"],
-		credentials: true,
-	},
 });
 
 // Online users tracking
