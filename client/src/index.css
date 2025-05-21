@@ -1,9 +1,25 @@
 @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap");
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 * {
 	font-family: "Outfit", sans-serif;
 }
+
+/* Form elementleri için stiller */
+form input:not(.bg-transparent),
+form textarea:not(.bg-transparent) {
+	@apply text-black;
+}
+
+/* Transparent background olan inputlar için stiller */
+input.bg-transparent,
+.bg-transparent input,
+[class*="bg-gray"] input {
+	@apply text-white;
+}
+
 ::-webkit-scrollbar {
 	display: none;
 }

@@ -48,6 +48,12 @@ const ChatContainer = () => {
 		}
 	}, [messages]);
 
+	// Basit online kullanıcı kontrolü
+	const isUserOnline = (userId) => {
+		if (!userId) return false;
+		return Array.isArray(onlineUsers) && onlineUsers.includes(userId);
+	};
+
 	return selectedUser ? (
 		<div className="h-full overflow-scroll relative backdrop-blur-lg">
 			{/*------header-----*/}
@@ -59,7 +65,7 @@ const ChatContainer = () => {
 				/>
 				<p className="flex-1 text-lg text-white flex items-center gap-2">
 					{selectedUser.fullName}
-					{onlineUsers.includes(selectedUser._id) && (
+					{isUserOnline(selectedUser._id) && (
 						<span className="w-2 h-2 rounded-full bg-green-500"></span>
 					)}
 				</p>
@@ -116,14 +122,14 @@ const ChatContainer = () => {
 			</div>
 			{/*----bottom area---- */}
 			<div className="absolute bottom-0 left-0 right-0 flex items-center gap-3 p-3">
-				<div className="flex-1 flex items-center bg-gray-100/12 px-3 rounded-full">
+				<div className="flex-1 flex items-center bg-[#282142]/60 border border-violet-500/30 px-3 rounded-full shadow-md">
 					<input
 						onChange={(e) => setInput(e.target.value)}
 						value={input}
 						onKeyDown={(e) => (e.key === "Enter" ? handleSendMessage(e) : null)}
 						type="text"
 						placeholder="Send a message"
-						className="flex-1 text-sm p-3 border-none rounded-lg outline-none text-white placeholder-gray-400"
+						className="flex-1 text-sm p-3 border-none rounded-lg outline-none bg-transparent text-white placeholder-gray-400"
 					/>
 					<input
 						onChange={handleSendImage}

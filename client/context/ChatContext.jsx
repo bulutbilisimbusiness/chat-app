@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { AuthContext } from "./AuthContext";
 
@@ -9,8 +9,9 @@ export const ChatProvider = ({ children }) => {
 	const [users, setUsers] = useState([]);
 	const [selectedUser, setSelectedUser] = useState(null);
 	const [unseenMessages, setUnseenMessages] = useState({});
+	const messageListenerActive = useRef(false);
 
-	const { socket, axios } = useContext(AuthContext);
+	const { socket, axios, authUser } = useContext(AuthContext);
 
 	const getUsers = async () => {
 		try {
@@ -23,6 +24,7 @@ export const ChatProvider = ({ children }) => {
 			toast.error(error.message);
 		}
 	};
+
 	const getMessages = async (userId) => {
 		try {
 			const { data } = await axios.get(`/api/messages/${userId}`);
@@ -33,6 +35,7 @@ export const ChatProvider = ({ children }) => {
 			toast.error(error.message);
 		}
 	};
+
 	const sendMessage = async (messageData) => {
 		try {
 			const { data } = await axios.post(
@@ -40,7 +43,14 @@ export const ChatProvider = ({ children }) => {
 				messageData
 			);
 			if (data.success) {
-				setMessages((prevMesaages) => [...prevMesaages, data.newMessage]);
+				setMessages((prevMessages) => [...prevMessages, data.newMessage]);
+				// Yeni mesajı socket üzerinden gönder
+				if (socket) {
+					socket.emit("sendMessage", {
+						message: data.newMessage,
+						receiverId: selectedUser._id,
+					});
+				}
 			} else {
 				toast.error(data.message);
 			}
@@ -48,30 +58,84 @@ export const ChatProvider = ({ children }) => {
 			toast.error(error.message);
 		}
 	};
-	const subscribeToMessages = async () => {
+
+	// Yeni mesaj alındığında
+	const handleNewMessage = (newMessage) => {
+		// Seçili kullanıcı ile mesajlaşıyorsak
+		if (selectedUser && newMessage.senderId === selectedUser._id) {
+			// Mesajı görüldü olarak işaretle
+			newMessage.seen = true;
+			// Mesajlar listesine ekle
+			setMessages((prevMessages) => [...prevMessages, newMessage]);
+			// Sunucuda mesajı görüldü olarak işaretle
+			axios.put(`/api/messages/mark/${newMessage._id}`);
+		}
+		// Başka biriyle mesajlaşıyorsak veya hiç mesajlaşmıyorsak
+		else {
+			// Görülmemiş mesajların sayısını güncelle
+			setUnseenMessages((prev) => ({
+				...prev,
+				[newMessage.senderId]: (prev[newMessage.senderId] || 0) + 1,
+			}));
+
+			// Yeni mesaj geldiğinde kullanıcı listesini güncelle
+			getUsers();
+		}
+	};
+
+	// Socket mesaj dinleme ayarları
+	const setupMessageListener = () => {
 		if (!socket) return;
-		socket.on("newMessage", (newMessage) => {
-			if (selectedUser && newMessage.senderId === selectedUser._id) {
-				newMessage.seen = true;
-				setMessages((prevMessages) => [...prevMessages, newMessage]);
-				axios.put(`/api/messages/mark/${newMessage._id}`);
-			} else {
-				setUnseenMessages((prevUnseenMessages) => ({
-					...prevUnseenMessages,
-					[newMessage.senderId]: prevUnseenMessages[newMessage.senderId]
-						? prevUnseenMessages[newMessage.senderId] + 1
-						: 1,
-				}));
-			}
+
+		socket.off("newMessage");
+		socket.off("messageReceived");
+
+		socket.on("messageReceived", (newMessage) => {
+			handleNewMessage(newMessage);
 		});
+
+		messageListenerActive.current = true;
 	};
-	const unsubscribeFromMessages = () => {
-		if (socket) socket.off("newMessage");
-	};
+
+	// Auth user değiştiğinde veya socket bağlantısı kurulduğunda/değiştiğinde kullanıcıları al
 	useEffect(() => {
-		subscribeToMessages();
-		return () => unsubscribeFromMessages();
-	}, [socket, selectedUser]);
+		if (authUser) {
+			getUsers();
+		}
+	}, [authUser, socket]);
+
+	// Seçili kullanıcı değiştiğinde
+	useEffect(() => {
+		if (selectedUser) {
+			// Seçili kullanıcı ile mesajları al
+			getMessages(selectedUser._id);
+
+			// Seçili kullanıcıdan gelen okunmamış mesajları sıfırla
+			setUnseenMessages((prev) => ({
+				...prev,
+				[selectedUser._id]: 0,
+			}));
+		}
+	}, [selectedUser]);
+
+	// Socket değiştiğinde mesaj dinleyiciyi ayarla
+	useEffect(() => {
+		if (socket && !messageListenerActive.current) {
+			console.log("Setting up message listener");
+			setupMessageListener();
+		}
+
+		// Component unmount olduğunda cleanup
+		return () => {
+			if (socket) {
+				console.log("Removing message listener");
+				socket.off("newMessage");
+				socket.off("messageReceived");
+				messageListenerActive.current = false;
+			}
+		};
+	}, [socket]);
+
 	const value = {
 		messages,
 		users,

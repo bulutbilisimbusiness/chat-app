@@ -12,7 +12,7 @@ const Sidebar = () => {
 		unseenMessages,
 		setUnseenMessages,
 	} = useContext(ChatContext);
-	const { logout, onlineUsers } = useContext(AuthContext);
+	const { logout, onlineUsers, authUser } = useContext(AuthContext);
 	const [input, setInput] = useState(false);
 	const navigate = useNavigate();
 	const filteredUsers = input
@@ -24,6 +24,14 @@ const Sidebar = () => {
 	useEffect(() => {
 		getUsers();
 	}, [onlineUsers]);
+
+	// Basit online kullanıcı kontrolü - kendi ID'miz de online olarak işaretlenir
+	const isUserOnline = (userId) => {
+		if (!userId) return false;
+		if (authUser && authUser._id === userId) return true; // Kendimiz her zaman online
+		return Array.isArray(onlineUsers) && onlineUsers.includes(userId);
+	};
+
 	return (
 		<div
 			className={`bg-[#8185B2]/10 h-full p-5 rounded-r-xl overflow-y-scroll text-white ${
@@ -64,37 +72,48 @@ const Sidebar = () => {
 				</div>
 			</div>
 			<div className="flex flex-col">
-				{filteredUsers.map((user, index) => (
-					<div
-						onClick={() => {
-							setSelectedUser(user);
-							setUnseenMessages((prev) => ({ ...prev, [user._id]: 0 }));
-						}}
-						key={index}
-						className={`relative flex items-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm ${
-							selectedUser?._id === user._id && "bg-[#282142]"
-						}`}
-					>
-						<img
-							src={user?.profilePic || assets.avatar_icon}
-							alt=""
-							className="w-[35px] aspect-[1/1] rounded-full"
-						/>
-						<div className="flex flex-col leading-5">
-							<p>{user.fullName}</p>
-							{onlineUsers?.includes?.(user._id) ? (
-								<span className="text-green-400 text-xs">Online</span>
-							) : (
-								<span className="text-neutral-400 text-xs">Offline</span>
+				{filteredUsers.map((user, index) => {
+					// Her kullanıcı için online durumunu kontrol et
+					const online = isUserOnline(user._id);
+					return (
+						<div
+							onClick={() => {
+								setSelectedUser(user);
+								setUnseenMessages((prev) => ({ ...prev, [user._id]: 0 }));
+							}}
+							key={index}
+							className={`relative flex items-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm ${
+								selectedUser?._id === user._id && "bg-[#282142]"
+							}`}
+						>
+							<div className="relative">
+								<img
+									src={user?.profilePic || assets.avatar_icon}
+									alt=""
+									className="w-[35px] aspect-[1/1] rounded-full"
+								/>
+								{online && (
+									<span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#282142]"></span>
+								)}
+							</div>
+							<div className="flex flex-col leading-5">
+								<p>{user.fullName}</p>
+								{online ? (
+									<span className="text-green-400 text-xs font-semibold">
+										Online
+									</span>
+								) : (
+									<span className="text-neutral-400 text-xs">Offline</span>
+								)}
+							</div>
+							{unseenMessages[user._id] > 0 && (
+								<p className="absolute top-4 right-4 text-xs h-5 w-5 flex justify-center items-center rounded-full bg-violet-500/50">
+									{unseenMessages[user._id]}
+								</p>
 							)}
 						</div>
-						{unseenMessages[user._id] > 0 && (
-							<p className="absolute top-4 right-4 text-xs h-5 w-5 flex justify-center items-center rounded-full bg-violet-500/50">
-								{unseenMessages[user._id]}
-							</p>
-						)}
-					</div>
-				))}
+					);
+				})}
 			</div>
 		</div>
 	);
