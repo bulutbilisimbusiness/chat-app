@@ -135,6 +135,23 @@ export const AuthProvider = ({ children }) => {
 				);
 			});
 
+			// Ping-pong mekanizması
+			newSocket.on("ping", () => {
+				console.log("Received ping from server");
+				newSocket.emit("pong");
+			});
+
+			// Periyodik olarak online durumu kontrolü
+			const statusCheckInterval = setInterval(() => {
+				if (newSocket.connected) {
+					console.log("Requesting online users update");
+					newSocket.emit("getOnlineUsers");
+				}
+			}, 30000);
+
+			// Socket nesnesine interval'i ekle (cleanup için)
+			newSocket.statusCheckInterval = statusCheckInterval;
+
 			setSocket(newSocket);
 		} catch (error) {
 			console.error("Socket initialization error:", error);
@@ -150,6 +167,8 @@ export const AuthProvider = ({ children }) => {
 
 		return () => {
 			if (socket) {
+				console.log("Cleaning up socket connection");
+				clearInterval(socket.statusCheckInterval);
 				socket.disconnect();
 			}
 		};

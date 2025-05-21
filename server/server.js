@@ -55,6 +55,10 @@ io.on("connection", (socket) => {
 		console.log(`User connected: ${userId}`);
 		userSocketMap[userId] = socket.id;
 
+		// İlk bağlantıda tüm kullanıcılara online durumunu bildir
+		io.emit("userStatusChanged", { userId, status: "online" });
+		io.emit("getOnlineUsers", Object.keys(userSocketMap));
+
 		// Kullanıcı açıkça bağlandığında
 		socket.on("userConnected", (userId) => {
 			console.log(`User explicitly connected: ${userId}`);
@@ -67,8 +71,20 @@ io.on("connection", (socket) => {
 
 		// Kullanıcı online durumunu sorduğunda
 		socket.on("getOnlineUsers", () => {
-			console.log("Sending online users list");
-			socket.emit("getOnlineUsers", Object.keys(userSocketMap));
+			console.log("Sending online users list:", Object.keys(userSocketMap));
+			io.emit("getOnlineUsers", Object.keys(userSocketMap));
+		});
+
+		// Periyodik olarak bağlantı kontrolü
+		const pingInterval = setInterval(() => {
+			socket.emit("ping");
+		}, 25000);
+
+		socket.on("pong", () => {
+			console.log(`User ${userId} is still connected`);
+			// Kullanıcının bağlantısını yenile
+			userSocketMap[userId] = socket.id;
+			io.emit("getOnlineUsers", Object.keys(userSocketMap));
 		});
 
 		// Mesaj gönderme
@@ -86,6 +102,7 @@ io.on("connection", (socket) => {
 		// Bağlantı koptuğunda
 		socket.on("disconnect", () => {
 			console.log(`User disconnected: ${userId}`);
+			clearInterval(pingInterval);
 			delete userSocketMap[userId];
 			// Tüm kullanıcılara offline durumunu bildir
 			io.emit("userStatusChanged", { userId, status: "offline" });
