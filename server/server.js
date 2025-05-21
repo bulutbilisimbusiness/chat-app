@@ -16,10 +16,7 @@ app.use(
 	cors({
 		origin:
 			process.env.NODE_ENV === "production"
-				? [
-						"https://chat-app-frontend-tau.vercel.app",
-						"https://chat-app-frontend-tau.vercel.app",
-				  ]
+				? ["https://chat-app-frontend-five-olive.vercel.app"]
 				: "http://localhost:5173",
 		credentials: true,
 	})
@@ -33,10 +30,7 @@ const io = new Server(server, {
 	cors: {
 		origin:
 			process.env.NODE_ENV === "production"
-				? [
-						"https://chat-app-frontend-tau.vercel.app",
-						"https://chat-app-frontend-tau.vercel.app",
-				  ]
+				? ["https://chat-app-frontend-five-olive.vercel.app"]
 				: "http://localhost:5173",
 		methods: ["GET", "POST"],
 		credentials: true,
