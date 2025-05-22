@@ -96,61 +96,28 @@ export const AuthProvider = ({ children }) => {
 			console.log("Connecting to socket.io server...");
 			const newSocket = io(backendUrl, {
 				query: { userId: userData._id },
-				transports: ["polling"],
-				path: "/socket.io/",
+				transports: ["websocket", "polling"],
+				path: "/socket.io",
 				reconnection: true,
-				reconnectionAttempts: 5,
-				reconnectionDelay: 2000,
-				timeout: 5000,
+				reconnectionAttempts: Infinity,
+				reconnectionDelay: 1000,
+				reconnectionDelayMax: 5000,
+				timeout: 20000,
 				forceNew: true,
 				withCredentials: true,
-				autoConnect: false,
-				upgrade: false,
 			});
-
-			let reconnectTimer = null;
-			let isReconnecting = false;
-
-			const attemptReconnect = () => {
-				if (!isReconnecting) {
-					isReconnecting = true;
-					console.log("Attempting manual reconnect...");
-					newSocket.connect();
-
-					// Clear previous reconnect timer
-					if (reconnectTimer) {
-						clearTimeout(reconnectTimer);
-					}
-
-					// Set new reconnect timer
-					reconnectTimer = setTimeout(() => {
-						isReconnecting = false;
-						if (!newSocket.connected) {
-							attemptReconnect();
-						}
-					}, 5000);
-				}
-			};
 
 			newSocket.on("connect", () => {
 				console.log("Socket connected successfully");
-				isReconnecting = false;
-				if (reconnectTimer) {
-					clearTimeout(reconnectTimer);
-				}
 				newSocket.emit("getOnlineUsers");
 			});
 
 			newSocket.on("connect_error", (error) => {
 				console.error("Socket.IO Connection Error:", error.message);
-				setOnlineUsers([]);
-				attemptReconnect();
 			});
 
 			newSocket.on("disconnect", (reason) => {
 				console.log("Socket disconnected:", reason);
-				setOnlineUsers([]);
-				attemptReconnect();
 			});
 
 			newSocket.on("onlineUsers", (users) => {
@@ -160,22 +127,15 @@ export const AuthProvider = ({ children }) => {
 				}
 			});
 
-			// Connect socket
-			newSocket.connect();
 			setSocket(newSocket);
 
-			// Cleanup function
 			return () => {
-				if (reconnectTimer) {
-					clearTimeout(reconnectTimer);
-				}
 				if (newSocket) {
 					newSocket.disconnect();
 				}
 			};
 		} catch (error) {
 			console.error("Socket initialization error:", error);
-			setOnlineUsers([]);
 		}
 	};
 

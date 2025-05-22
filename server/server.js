@@ -27,64 +27,62 @@ app.use(express.json({ limit: "4mb" }));
 // Socket.IO setup
 const io = new Server(server, {
 	cors: corsOptions,
-	path: "/socket.io/",
-	transports: ["polling", "websocket"],
+	path: "/socket.io",
+	transports: ["websocket", "polling"],
 	allowEIO3: true,
-	pingTimeout: 10000,
-	pingInterval: 5000,
+	pingTimeout: 60000,
+	pingInterval: 25000,
+	cookie: false,
+	connectTimeout: 30000,
 });
 
 // Online users tracking
-const userSocketMap = {};
+const userSocketMap = new Map();
+const disconnectTimeouts = new Map();
 
-// Middleware to handle authentication
-io.use((socket, next) => {
-	const userId = socket.handshake.query.userId;
-	if (!userId) {
-		return next(new Error("Authentication error"));
-	}
-	socket.userId = userId;
-	next();
+// Socket.IO health check endpoint
+app.get("/socket.io", (req, res) => {
+	res.send({ status: "ok" });
 });
 
 io.on("connection", (socket) => {
-	const userId = socket.userId;
-	console.log(`User connected: ${userId}`);
+	const userId = socket.handshake.query.userId;
+	if (userId) {
+		console.log(`User connected: ${userId}`);
 
-	// Add user to online users
-	userSocketMap[userId] = socket.id;
-
-	// Broadcast to all clients that a new user is online
-	io.emit("onlineUsers", Object.keys(userSocketMap));
-
-	// Handle ping request
-	socket.on("ping", () => {
-		socket.emit("pong");
-	});
-
-	socket.on("getOnlineUsers", () => {
-		socket.emit("onlineUsers", Object.keys(userSocketMap));
-	});
-
-	socket.on("sendMessage", ({ message, receiverId }) => {
-		const receiverSocketId = userSocketMap[receiverId];
-		if (receiverSocketId) {
-			io.to(receiverSocketId).emit("messageReceived", message);
+		// Clear any existing disconnect timeout
+		if (disconnectTimeouts.has(userId)) {
+			clearTimeout(disconnectTimeouts.get(userId));
+			disconnectTimeouts.delete(userId);
 		}
-	});
 
-	socket.on("disconnect", () => {
-		console.log(`User disconnected: ${userId}`);
-		delete userSocketMap[userId];
-		io.emit("onlineUsers", Object.keys(userSocketMap));
-	});
+		userSocketMap.set(userId, socket.id);
+		io.emit("onlineUsers", Array.from(userSocketMap.keys()));
 
-	// Handle errors
-	socket.on("error", (error) => {
-		console.error(`Socket error for user ${userId}:`, error);
-		delete userSocketMap[userId];
-		io.emit("onlineUsers", Object.keys(userSocketMap));
-	});
+		socket.on("getOnlineUsers", () => {
+			socket.emit("onlineUsers", Array.from(userSocketMap.keys()));
+		});
+
+		socket.on("sendMessage", ({ message, receiverId }) => {
+			const receiverSocketId = userSocketMap.get(receiverId);
+			if (receiverSocketId) {
+				io.to(receiverSocketId).emit("messageReceived", message);
+			}
+		});
+
+		socket.on("disconnect", (reason) => {
+			console.log(`User disconnected: ${userId}, reason: ${reason}`);
+
+			// Set a timeout before removing the user from online list
+			const timeout = setTimeout(() => {
+				userSocketMap.delete(userId);
+				io.emit("onlineUsers", Array.from(userSocketMap.keys()));
+				disconnectTimeouts.delete(userId);
+			}, 10000); // 10 seconds grace period for reconnection
+
+			disconnectTimeouts.set(userId, timeout);
+		});
+	}
 });
 
 // Export for controllers
@@ -94,14 +92,9 @@ app.set("userSocketMap", userSocketMap);
 // Connect to MongoDB
 connectDB().catch((err) => console.error("Database connection error:", err));
 
-// Health check endpoint
+// API routes
 app.get("/", (req, res) => {
 	res.json({ message: "Chat App API is running" });
-});
-
-// Socket.IO health check endpoint
-app.get("/socket.io-health", (req, res) => {
-	res.json({ status: "ok", connections: Object.keys(userSocketMap).length });
 });
 
 app.use("/api/auth", userRouter);

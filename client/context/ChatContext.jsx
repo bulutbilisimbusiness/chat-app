@@ -9,9 +9,23 @@ export const ChatProvider = ({ children }) => {
 	const [users, setUsers] = useState([]);
 	const [selectedUser, setSelectedUser] = useState(null);
 	const [unseenMessages, setUnseenMessages] = useState({});
+	const [userStatuses, setUserStatuses] = useState({}); // Online/offline durumları
 	const messageListenerActive = useRef(false);
+	const lastMessageTimestamp = useRef({}); // Son mesaj zamanları
 
-	const { socket, axios, authUser } = useContext(AuthContext);
+	const { socket, axios, authUser, onlineUsers } = useContext(AuthContext);
+
+	// Kullanıcı durumlarını güncelle
+	const updateUserStatuses = (onlineUserIds) => {
+		const newStatuses = {};
+		users.forEach((user) => {
+			newStatuses[user._id] = {
+				online: onlineUserIds.includes(user._id),
+				lastSeen: lastMessageTimestamp.current[user._id] || null,
+			};
+		});
+		setUserStatuses(newStatuses);
+	};
 
 	const getUsers = async () => {
 		try {
@@ -19,6 +33,10 @@ export const ChatProvider = ({ children }) => {
 			if (data.success) {
 				setUsers(data.users);
 				setUnseenMessages(data.unseenMessages);
+				// Kullanıcı listesi güncellendiğinde online durumları da güncelle
+				if (onlineUsers) {
+					updateUserStatuses(onlineUsers);
+				}
 			}
 		} catch (error) {
 			toast.error(error.message);
@@ -30,6 +48,11 @@ export const ChatProvider = ({ children }) => {
 			const { data } = await axios.get(`/api/messages/${userId}`);
 			if (data.success) {
 				setMessages(data.messages);
+				// Son mesaj zamanını güncelle
+				if (data.messages.length > 0) {
+					const lastMsg = data.messages[data.messages.length - 1];
+					lastMessageTimestamp.current[userId] = lastMsg.createdAt;
+				}
 			}
 		} catch (error) {
 			toast.error(error.message);
@@ -45,10 +68,9 @@ export const ChatProvider = ({ children }) => {
 			if (data.success) {
 				const newMessage = data.newMessage;
 				setMessages((prevMessages) => [...prevMessages, newMessage]);
+				lastMessageTimestamp.current[selectedUser._id] = newMessage.createdAt;
 
-				// Yeni mesajı socket üzerinden gönder
 				if (socket) {
-					console.log("Sending message via socket:", newMessage);
 					socket.emit("sendMessage", {
 						message: newMessage,
 						receiverId: selectedUser._id,
@@ -63,58 +85,49 @@ export const ChatProvider = ({ children }) => {
 		}
 	};
 
-	// Yeni mesaj alındığında
 	const handleNewMessage = (newMessage) => {
-		console.log("New message received:", newMessage);
-
-		// Seçili kullanıcı ile mesajlaşıyorsak
 		if (selectedUser && newMessage.senderId === selectedUser._id) {
-			console.log("Message is from selected user, marking as seen");
-			// Mesajı görüldü olarak işaretle
 			newMessage.seen = true;
-			// Mesajlar listesine ekle
 			setMessages((prevMessages) => [...prevMessages, newMessage]);
-			// Sunucuda mesajı görüldü olarak işaretle
+			lastMessageTimestamp.current[newMessage.senderId] = newMessage.createdAt;
+
 			axios.put(`/api/messages/mark/${newMessage._id}`).catch((error) => {
 				console.error("Error marking message as seen:", error);
 			});
-		}
-		// Başka biriyle mesajlaşıyorsak veya hiç mesajlaşmıyorsak
-		else {
-			console.log("Message is from another user, updating unseen count");
-			// Görülmemiş mesajların sayısını güncelle
+		} else {
 			setUnseenMessages((prev) => ({
 				...prev,
 				[newMessage.senderId]: (prev[newMessage.senderId] || 0) + 1,
 			}));
-
-			// Yeni mesaj geldiğinde kullanıcı listesini güncelle
+			lastMessageTimestamp.current[newMessage.senderId] = newMessage.createdAt;
 			getUsers();
 		}
 	};
 
-	// Socket mesaj dinleme ayarları
-	const setupMessageListener = () => {
-		if (!socket) {
-			console.log("No socket connection available");
-			return;
+	// Socket mesaj dinleyicileri
+	useEffect(() => {
+		if (socket && !messageListenerActive.current) {
+			socket.off("messageReceived");
+			socket.on("messageReceived", handleNewMessage);
+			messageListenerActive.current = true;
 		}
 
-		console.log("Setting up message listeners");
+		return () => {
+			if (socket) {
+				socket.off("messageReceived");
+				messageListenerActive.current = false;
+			}
+		};
+	}, [socket]);
 
-		// Önceki dinleyicileri temizle
-		socket.off("messageReceived");
+	// Online kullanıcılar değiştiğinde durumları güncelle
+	useEffect(() => {
+		if (onlineUsers && users.length > 0) {
+			updateUserStatuses(onlineUsers);
+		}
+	}, [onlineUsers, users]);
 
-		// Yeni mesaj dinleyicisini ekle
-		socket.on("messageReceived", (newMessage) => {
-			console.log("Message received via socket:", newMessage);
-			handleNewMessage(newMessage);
-		});
-
-		messageListenerActive.current = true;
-	};
-
-	// Auth user değiştiğinde veya socket bağlantısı kurulduğunda/değiştiğinde kullanıcıları al
+	// Auth user veya socket değiştiğinde kullanıcıları güncelle
 	useEffect(() => {
 		if (authUser) {
 			getUsers();
@@ -124,10 +137,7 @@ export const ChatProvider = ({ children }) => {
 	// Seçili kullanıcı değiştiğinde
 	useEffect(() => {
 		if (selectedUser) {
-			// Seçili kullanıcı ile mesajları al
 			getMessages(selectedUser._id);
-
-			// Seçili kullanıcıdan gelen okunmamış mesajları sıfırla
 			setUnseenMessages((prev) => ({
 				...prev,
 				[selectedUser._id]: 0,
@@ -135,27 +145,11 @@ export const ChatProvider = ({ children }) => {
 		}
 	}, [selectedUser]);
 
-	// Socket değiştiğinde mesaj dinleyiciyi ayarla
-	useEffect(() => {
-		if (socket && !messageListenerActive.current) {
-			console.log("Setting up message listener");
-			setupMessageListener();
-		}
-
-		// Component unmount olduğunda cleanup
-		return () => {
-			if (socket) {
-				console.log("Cleaning up message listeners");
-				socket.off("messageReceived");
-				messageListenerActive.current = false;
-			}
-		};
-	}, [socket]);
-
 	const value = {
 		messages,
 		users,
 		selectedUser,
+		userStatuses,
 		getUsers,
 		getMessages,
 		sendMessage,

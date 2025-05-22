@@ -6,9 +6,15 @@ import assets from "../assets/assets";
 import { formatMessageTime } from "../lib/utils";
 
 const ChatContainer = () => {
-	const { messages, selectedUser, setSelectedUser, sendMessage, getMessages } =
-		useContext(ChatContext);
-	const { authUser, onlineUsers } = useContext(AuthContext);
+	const {
+		messages,
+		selectedUser,
+		setSelectedUser,
+		sendMessage,
+		getMessages,
+		userStatuses,
+	} = useContext(ChatContext);
+	const { authUser } = useContext(AuthContext);
 	const scrollEnd = useRef();
 
 	const [input, setInput] = useState("");
@@ -48,10 +54,11 @@ const ChatContainer = () => {
 		}
 	}, [messages]);
 
-	// Basit online kullanıcı kontrolü
-	const isUserOnline = (userId) => {
-		if (!userId) return false;
-		return Array.isArray(onlineUsers) && onlineUsers.includes(userId);
+	// Gelişmiş online durum kontrolü
+	const getUserStatus = (userId) => {
+		if (!userId || !userStatuses[userId])
+			return { online: false, lastSeen: null };
+		return userStatuses[userId];
 	};
 
 	return selectedUser ? (
@@ -63,12 +70,21 @@ const ChatContainer = () => {
 					alt=""
 					className="w-8 rounded-full"
 				/>
-				<p className="flex-1 text-lg text-white flex items-center gap-2">
-					{selectedUser.fullName}
-					{isUserOnline(selectedUser._id) && (
-						<span className="w-2 h-2 rounded-full bg-green-500"></span>
-					)}
-				</p>
+				<div className="flex-1 text-lg text-white">
+					<div className="flex items-center gap-2">
+						{selectedUser.fullName}
+						{getUserStatus(selectedUser._id).online ? (
+							<span className="w-2 h-2 rounded-full bg-green-500"></span>
+						) : (
+							getUserStatus(selectedUser._id).lastSeen && (
+								<span className="text-xs text-gray-400">
+									Last seen:{" "}
+									{formatMessageTime(getUserStatus(selectedUser._id).lastSeen)}
+								</span>
+							)
+						)}
+					</div>
+				</div>
 				<img
 					onClick={() => setSelectedUser(null)}
 					src={assets.arrow_icon}
