@@ -1,5 +1,5 @@
-# React + Vite +Express + Socket.IO + MongoDB
+# React + Vite +Express + Socket.IO + MongoD
 
 ## 🔗 Live Demo
 
-👉 [Click and try now](https://tailwind-portfolio-pi-five.vercel.app/)
+👉 [Click and try now](https://chat-app-frontend-five-olive.vercel.app/)
