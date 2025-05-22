@@ -30,50 +30,61 @@ const io = new Server(server, {
 	path: "/socket.io/",
 	transports: ["polling", "websocket"],
 	allowEIO3: true,
-	pingTimeout: 60000,
-	pingInterval: 25000,
-	maxHttpBufferSize: 1e8,
-	allowUpgrades: true,
+	pingTimeout: 10000,
+	pingInterval: 5000,
 });
 
 // Online users tracking
 const userSocketMap = {};
 
-io.on("connection", (socket) => {
+// Middleware to handle authentication
+io.use((socket, next) => {
 	const userId = socket.handshake.query.userId;
-	if (userId) {
-		console.log(`User connected: ${userId}`);
-		userSocketMap[userId] = socket.id;
-
-		// Send initial online users list
-		io.emit("onlineUsers", Object.keys(userSocketMap));
-
-		// Handle getOnlineUsers request
-		socket.on("getOnlineUsers", () => {
-			socket.emit("onlineUsers", Object.keys(userSocketMap));
-		});
-
-		socket.on("sendMessage", ({ message, receiverId }) => {
-			const receiverSocketId = userSocketMap[receiverId];
-			if (receiverSocketId) {
-				io.to(receiverSocketId).emit("messageReceived", message);
-			}
-		});
-
-		// Handle disconnection
-		socket.on("disconnect", (reason) => {
-			console.log(`User disconnected: ${userId}, reason: ${reason}`);
-			delete userSocketMap[userId];
-			io.emit("onlineUsers", Object.keys(userSocketMap));
-		});
-
-		// Handle errors
-		socket.on("error", (error) => {
-			console.error(`Socket error for user ${userId}:`, error);
-			delete userSocketMap[userId];
-			io.emit("onlineUsers", Object.keys(userSocketMap));
-		});
+	if (!userId) {
+		return next(new Error("Authentication error"));
 	}
+	socket.userId = userId;
+	next();
+});
+
+io.on("connection", (socket) => {
+	const userId = socket.userId;
+	console.log(`User connected: ${userId}`);
+
+	// Add user to online users
+	userSocketMap[userId] = socket.id;
+
+	// Broadcast to all clients that a new user is online
+	io.emit("onlineUsers", Object.keys(userSocketMap));
+
+	// Handle ping request
+	socket.on("ping", () => {
+		socket.emit("pong");
+	});
+
+	socket.on("getOnlineUsers", () => {
+		socket.emit("onlineUsers", Object.keys(userSocketMap));
+	});
+
+	socket.on("sendMessage", ({ message, receiverId }) => {
+		const receiverSocketId = userSocketMap[receiverId];
+		if (receiverSocketId) {
+			io.to(receiverSocketId).emit("messageReceived", message);
+		}
+	});
+
+	socket.on("disconnect", () => {
+		console.log(`User disconnected: ${userId}`);
+		delete userSocketMap[userId];
+		io.emit("onlineUsers", Object.keys(userSocketMap));
+	});
+
+	// Handle errors
+	socket.on("error", (error) => {
+		console.error(`Socket error for user ${userId}:`, error);
+		delete userSocketMap[userId];
+		io.emit("onlineUsers", Object.keys(userSocketMap));
+	});
 });
 
 // Export for controllers

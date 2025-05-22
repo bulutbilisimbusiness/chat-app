@@ -100,65 +100,75 @@ export const AuthProvider = ({ children }) => {
 				path: "/socket.io/",
 				reconnection: true,
 				reconnectionAttempts: 5,
-				reconnectionDelay: 1000,
-				timeout: 20000,
+				reconnectionDelay: 2000,
+				timeout: 5000,
 				forceNew: true,
 				withCredentials: true,
 				autoConnect: false,
+				upgrade: false,
 			});
 
-			// Setup event handlers before connecting
+			let reconnectTimer = null;
+			let isReconnecting = false;
+
+			const attemptReconnect = () => {
+				if (!isReconnecting) {
+					isReconnecting = true;
+					console.log("Attempting manual reconnect...");
+					newSocket.connect();
+
+					// Clear previous reconnect timer
+					if (reconnectTimer) {
+						clearTimeout(reconnectTimer);
+					}
+
+					// Set new reconnect timer
+					reconnectTimer = setTimeout(() => {
+						isReconnecting = false;
+						if (!newSocket.connected) {
+							attemptReconnect();
+						}
+					}, 5000);
+				}
+			};
+
 			newSocket.on("connect", () => {
 				console.log("Socket connected successfully");
+				isReconnecting = false;
+				if (reconnectTimer) {
+					clearTimeout(reconnectTimer);
+				}
 				newSocket.emit("getOnlineUsers");
 			});
 
 			newSocket.on("connect_error", (error) => {
 				console.error("Socket.IO Connection Error:", error.message);
 				setOnlineUsers([]);
-
-				// Try to reconnect after a delay
-				setTimeout(() => {
-					console.log("Attempting to reconnect...");
-					newSocket.connect();
-				}, 2000);
+				attemptReconnect();
 			});
 
 			newSocket.on("disconnect", (reason) => {
 				console.log("Socket disconnected:", reason);
 				setOnlineUsers([]);
-
-				if (reason === "io server disconnect" || reason === "transport close") {
-					setTimeout(() => {
-						console.log("Attempting to reconnect after disconnect...");
-						newSocket.connect();
-					}, 2000);
-				}
+				attemptReconnect();
 			});
 
 			newSocket.on("onlineUsers", (users) => {
-				console.log("Online users:", users);
+				console.log("Online users received:", users);
 				if (Array.isArray(users)) {
 					setOnlineUsers(users);
-				} else {
-					setOnlineUsers([]);
 				}
 			});
 
-			// Connect after setting up handlers
+			// Connect socket
 			newSocket.connect();
 			setSocket(newSocket);
 
-			// Health check interval
-			const healthCheck = setInterval(() => {
-				if (newSocket.connected) {
-					newSocket.emit("getOnlineUsers");
-				}
-			}, 30000);
-
-			// Cleanup on unmount
+			// Cleanup function
 			return () => {
-				clearInterval(healthCheck);
+				if (reconnectTimer) {
+					clearTimeout(reconnectTimer);
+				}
 				if (newSocket) {
 					newSocket.disconnect();
 				}
