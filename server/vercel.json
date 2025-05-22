@@ -9,12 +9,6 @@
 	"routes": [
 		{
 			"src": "/socket.io/(.*)",
-			"headers": {
-				"Access-Control-Allow-Origin": "https://chat-app-frontend-five-olive.vercel.app",
-				"Access-Control-Allow-Methods": "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
-				"Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization, token",
-				"Access-Control-Allow-Credentials": "true"
-			},
 			"continue": true
 		},
 		{
